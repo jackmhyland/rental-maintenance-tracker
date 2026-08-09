@@ -2,6 +2,10 @@
 
 AI-powered rental property maintenance request tracker built for MNGT 745 Assignment 5B.
 
+## Live App
+
+https://rental-maintenance-tracker.vercel.app
+
 ## What this app does
 
 A small internal tool for a landlord/property manager to log tenant maintenance requests, get an AI-assisted priority recommendation for each one, and track them to completion.
@@ -52,8 +56,8 @@ npm run dev
 
 ## Deployment notes (Vercel + Supabase)
 
-- The `maintenance_requests` table and its columns already exist in Supabase (Assignment 5A) and Row Level Security is enabled on it — no schema changes are needed for this app to work, since all access goes through the server-side secret key.
-- Add all five environment variables above in Vercel Project Settings → Environment Variables before deploying.
+- The `maintenance_requests` table and its columns are configured in Supabase with Row Level Security enabled, and the app accesses it through the server-side Supabase secret key.
+- Add the four required environment variables above (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`, `ANTHROPIC_API_KEY`) in Vercel Project Settings → Environment Variables before deploying. `CRON_SECRET` is optional.
 - The daily follow-up job is defined in `vercel.json` (`crons`) and requires a paid or Hobby-eligible Vercel plan that supports Cron Jobs; if `CRON_SECRET` is set as a Vercel env var, Vercel automatically authenticates its own cron requests with it.
 - **Caveat:** if your Supabase table has a database-level trigger that auto-updates `updated_at` on *every* row update (a common Supabase pattern, not shown in the schema I was given), the daily cron job's own write to `needs_follow_up` would itself reset the "last updated" clock. If you have such a trigger, either remove it for this table or exclude `needs_follow_up`-only updates from it, so the 3-day staleness check reflects genuine inactivity rather than the cron job's own writes.
 - "Rental Property" is a free-text column with no properties table behind it, so the New Request form's property dropdown is a hardcoded placeholder list in `lib/constants.ts` (`PROPERTIES`) — edit that list to match your actual properties.
