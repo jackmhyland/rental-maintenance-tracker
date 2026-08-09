@@ -194,7 +194,7 @@ export default function RequestDetailClient({
           <div className="space-y-3">
             <div className="flex items-center gap-2">
               <span className="text-sm font-medium text-slate-700">
-                Claude's recommended priority:
+                Claude&apos;s recommended priority:
               </span>
               <PriorityBadge priority={req.claude_priority} />
             </div>
