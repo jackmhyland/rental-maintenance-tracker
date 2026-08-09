@@ -125,8 +125,19 @@ Recommend exactly one priority (Emergency, High, Medium, or Low), a short explan
     .select()
     .single();
 
-  if (updateError) {
-    return NextResponse.json({ error: updateError.message }, { status: 500 });
+  // A missing row with no explicit error means the UPDATE matched zero rows
+  // (e.g. blocked by Row Level Security or a permissions issue) — that must
+  // be treated as a failure, not a silent success, or the UI shows Claude's
+  // recommendation as "saved" when it never actually reached the database.
+  if (updateError || !updated) {
+    return NextResponse.json(
+      {
+        error:
+          updateError?.message ??
+          "Claude's recommendation was generated but did not persist — no row was returned by Supabase. Check RLS policies and table privileges for the key used by SUPABASE_SECRET_KEY.",
+      },
+      { status: 500 }
+    );
   }
 
   return NextResponse.json({ request: updated });

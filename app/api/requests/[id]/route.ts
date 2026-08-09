@@ -107,8 +107,19 @@ export async function PATCH(
     .select()
     .single();
 
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  // A missing row with no explicit error means the UPDATE matched zero rows
+  // (e.g. blocked by Row Level Security or a permissions issue) — that must
+  // be treated as a failure, not a silent success, or the UI shows a
+  // "successful" save that never actually reached the database.
+  if (error || !data) {
+    return NextResponse.json(
+      {
+        error:
+          error?.message ??
+          "The update did not persist — no row was returned by Supabase. Check RLS policies and table privileges for the key used by SUPABASE_SECRET_KEY.",
+      },
+      { status: 500 }
+    );
   }
 
   return NextResponse.json({ request: data });

@@ -21,5 +21,14 @@ export function getSupabaseServerClient() {
       persistSession: false,
       autoRefreshToken: false,
     },
+    // The Supabase client makes its requests with fetch(), and Next.js
+    // patches the global fetch() to cache GET requests by default. Without
+    // this, reads made right after a write (e.g. router.refresh(), or a
+    // hard page reload shortly after) can be served stale/cached data,
+    // making a successful update look like it didn't persist. Force every
+    // Supabase request to bypass that cache.
+    global: {
+      fetch: (input, init) => fetch(input, { ...init, cache: "no-store" }),
+    },
   });
 }

@@ -290,7 +290,7 @@ export default function RequestDetailClient({
               </select>
               <button
                 onClick={handleSaveStatus}
-                disabled={savingStatus || statusValue === req.status}
+                disabled={savingStatus}
                 className="whitespace-nowrap rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
               >
                 Save
@@ -316,10 +316,7 @@ export default function RequestDetailClient({
               </select>
               <button
                 onClick={handleSaveResponsible}
-                disabled={
-                  savingResponsible ||
-                  responsibleValue === (req.responsible_party ?? "")
-                }
+                disabled={savingResponsible}
                 className="whitespace-nowrap rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
               >
                 Save
