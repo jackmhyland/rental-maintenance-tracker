@@ -22,6 +22,7 @@ There is no login system. The app has a single implicit user (the property manag
 |---|---|---|
 | `GET /api/cron/follow-up` | **Scheduled** — Vercel Cron, once daily (`vercel.json`) | For every unresolved request, sets `needs_follow_up = true` if `updated_at` is 3+ days old, otherwise `false`. Never touches priority, status, or anything else, and never contacts anyone. |
 | `POST /api/requests/[id]/analyze` | **On-demand** — triggered by the "Analyze Request" button | The agentic step. Calls the Anthropic API from server-side code only, asking Claude to recommend one priority, explain it, and suggest a next action, and writes the result back to Supabase. |
+| `POST /api/requests/[id]/work-order` | **On-demand** — triggered by the "Generate Contractor Work Order" button | Assignment 6 capstone addition. Calls the Anthropic API from server-side code only to draft a contractor-ready work order from the maintenance record, and writes it back to Supabase. Only runs when the request has a saved final priority, Responsible Party is Contractor, and the request isn't Complete. |
 
 ## Which step calls Claude
 
@@ -33,6 +34,45 @@ Only `app/api/requests/[id]/analyze/route.ts` calls the Anthropic API. It:
 4. Writes the result to `claude_priority`, `claude_explanation`, `claude_suggested_action`. Claude never writes to `status`, `final_priority`, or `recommendation_decision` — those only change when the property manager explicitly accepts or overrides the recommendation in the UI (`recommendation_decision` + `final_priority`).
 
 Claude is advisory only: the UI always shows the recommendation separately from an "Accept" button and an "Override" control (final priority dropdown + save), and only the human's decision is stored as the authoritative `final_priority`.
+
+## AI Contractor Work Order Generator (Assignment 6 Capstone)
+
+An addition to the Request Details page that drafts a contractor-ready work order from a maintenance request already on file.
+
+A work order can only be generated (or edited) once all three are true:
+
+- a final priority has been saved (`final_priority` is set),
+- Responsible Party is set to `Contractor`, and
+- the request is not `Complete`.
+
+Both `POST /api/requests/[id]/work-order` (generation) and the PATCH action `update_work_order_draft` (manual edits) enforce these checks server-side — the UI mirrors them for clarity, but they aren't UI-only rules.
+
+`POST /api/requests/[id]/work-order` calls Claude with a forced tool call (structured output, same pattern as Analyze) and asks it to draft a work order with exactly these sections:
+
+- Property
+- Priority
+- Issue
+- Reported Condition
+- Relevant History / Troubleshooting
+- Requested Scope
+- Important Limitations
+
+Claude drafts only — it is explicitly instructed, and has no means, to: choose or contact a contractor, authorize repairs, authorize spending, provide or promise pricing, change the final priority, change the responsible party, mark the request complete, or state an uncertain diagnosis as established fact. The route's own Supabase update is scoped so Claude's output can only ever write to `work_order_draft`, `work_order_generated_at`, and `updated_at` — never to priority, status, or responsible-party fields.
+
+The prompt sent to Claude excludes the tenant's name and preferred contact method entirely — only property, request title, description, date received, final priority, responsible party, notes, and the earlier `claude_suggested_action` are included.
+
+The landlord reviews the generated draft in an editable textarea and may revise it before deciding whether to use or share it with a contractor — the app never sends, emails, or otherwise transmits the draft on its own. Edits are saved back via the `update_work_order_draft` PATCH action, which only ever touches `work_order_draft` and `updated_at`.
+
+Drafts persist in Supabase in two new nullable columns on `maintenance_requests`: `work_order_draft` (text) and `work_order_generated_at` (timestamptz). An existing draft is not deleted if Responsible Party later changes away from Contractor — it just becomes read-only again until eligibility is restored. Once a request is marked `Complete`, any saved draft is shown for reference but can no longer be generated or edited.
+
+### Capstone Governance
+
+- **Hallucination risk** — Claude could invent or overstate facts about a repair it has no way of verifying. The prompt restricts it to only the information already on the maintenance record, and every draft is reviewed by a human before use.
+- **Privacy risk** — only maintenance-relevant fields are sent to Claude; the tenant's name and contact information are excluded from the work-order prompt entirely.
+- **Accountability** — the landlord/property manager remains responsible for reviewing the draft and deciding whether to act on it; Claude's output is never treated as a decision.
+- **Autonomy limit** — Claude only drafts text. It cannot send anything, contact anyone, select a contractor, or change any operational field (priority, responsible party, status).
+- **Sign-off point** — a human reviews the draft before it is shared with a contractor; nothing leaves the app automatically.
+- **Failure handling** — because nothing is sent automatically, an inaccurate or unusable draft can simply be edited or ignored before any real-world action is taken, making this AI step fully reversible.
 
 ## Required environment variables
 
