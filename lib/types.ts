@@ -23,4 +23,6 @@ export interface MaintenanceRequest {
   created_at: string;
   updated_at: string;
   completed_at: string | null;
+  work_order_draft: string | null;
+  work_order_generated_at: string | null;
 }

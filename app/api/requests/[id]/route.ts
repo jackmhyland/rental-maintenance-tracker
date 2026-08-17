@@ -13,7 +13,8 @@ type Action =
       decision: "accepted" | "overridden";
       final_priority: string;
     }
-  | { action: "complete" };
+  | { action: "complete" }
+  | { action: "update_work_order_draft"; work_order_draft: string };
 
 function appendNote(existing: string | null, note: string): string {
   const timestamp = new Date().toLocaleString("en-US", {
@@ -94,6 +95,45 @@ export async function PATCH(
     case "complete": {
       update.status = "Complete";
       update.completed_at = new Date().toISOString();
+      break;
+    }
+    case "update_work_order_draft": {
+      if (typeof body.work_order_draft !== "string") {
+        return NextResponse.json(
+          { error: "work_order_draft must be a string" },
+          { status: 400 }
+        );
+      }
+      const { data: existing, error: fetchError } = await supabase
+        .from("maintenance_requests")
+        .select("responsible_party, final_priority")
+        .eq("id", id)
+        .single();
+      if (fetchError || !existing) {
+        return NextResponse.json({ error: "Request not found" }, { status: 404 });
+      }
+      if (existing.responsible_party !== "Contractor") {
+        return NextResponse.json(
+          {
+            error:
+              "A work order can only be edited once Responsible Party is set to Contractor.",
+          },
+          { status: 400 }
+        );
+      }
+      if (
+        !existing.final_priority ||
+        !PRIORITIES.includes(existing.final_priority as (typeof PRIORITIES)[number])
+      ) {
+        return NextResponse.json(
+          {
+            error:
+              "A work order can only be edited once a final priority (Emergency, High, Medium, or Low) has been set.",
+          },
+          { status: 400 }
+        );
+      }
+      update.work_order_draft = body.work_order_draft;
       break;
     }
     default:
