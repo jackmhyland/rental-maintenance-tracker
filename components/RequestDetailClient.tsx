@@ -37,12 +37,18 @@ export default function RequestDetailClient({
     req.final_priority ?? req.claude_priority ?? PRIORITIES[2]
   );
 
+  const [workOrderDraft, setWorkOrderDraft] = useState(
+    req.work_order_draft ?? ""
+  );
+
   const [analyzing, setAnalyzing] = useState(false);
   const [savingStatus, setSavingStatus] = useState(false);
   const [savingResponsible, setSavingResponsible] = useState(false);
   const [savingNote, setSavingNote] = useState(false);
   const [savingRecommendation, setSavingRecommendation] = useState(false);
   const [completing, setCompleting] = useState(false);
+  const [generatingWorkOrder, setGeneratingWorkOrder] = useState(false);
+  const [savingWorkOrder, setSavingWorkOrder] = useState(false);
 
   function applyUpdate(updated: MaintenanceRequest) {
     setReq(updated);
@@ -137,7 +143,37 @@ export default function RequestDetailClient({
     setCompleting(false);
   }
 
+  async function handleGenerateWorkOrder() {
+    setGeneratingWorkOrder(true);
+    await withErrorHandling(async () => {
+      const response = await fetch(`/api/requests/${req.id}/work-order`, {
+        method: "POST",
+      });
+      const json = await response.json();
+      if (!response.ok) {
+        throw new Error(json.error ?? "Work order generation failed");
+      }
+      applyUpdate(json.request as MaintenanceRequest);
+      setWorkOrderDraft(json.request.work_order_draft ?? "");
+    });
+    setGeneratingWorkOrder(false);
+  }
+
+  async function handleSaveWorkOrder() {
+    setSavingWorkOrder(true);
+    await withErrorHandling(async () => {
+      const updated = await patchRequest(req.id, {
+        action: "update_work_order_draft",
+        work_order_draft: workOrderDraft,
+      });
+      applyUpdate(updated);
+    });
+    setSavingWorkOrder(false);
+  }
+
   const isComplete = req.status === "Complete";
+  const isWorkOrderEligible =
+    req.responsible_party === "Contractor" && req.final_priority !== null;
 
   return (
     <div className="space-y-6">
@@ -324,6 +360,67 @@ export default function RequestDetailClient({
             </div>
           </div>
         </div>
+      </Section>
+
+      {/* Contractor work order */}
+      <Section title="Contractor Work Order">
+        {isComplete ? (
+          <>
+            {req.work_order_draft && (
+              <pre className="mb-3 whitespace-pre-wrap rounded-md bg-slate-50 p-3 text-sm text-slate-700">
+                {req.work_order_draft}
+              </pre>
+            )}
+            <p className="text-sm text-slate-500">
+              This request is complete — work orders can no longer be
+              generated or edited.
+            </p>
+          </>
+        ) : !isWorkOrderEligible ? (
+          <p className="text-sm text-slate-500">
+            Set a final priority and assign Responsible Party to Contractor
+            before generating a work order.
+          </p>
+        ) : (
+          <div className="space-y-3">
+            <p className="text-sm text-slate-500">
+              Claude creates a draft only. Review it for accuracy before
+              sharing it with a contractor.
+            </p>
+            {req.work_order_draft ? (
+              <>
+                <textarea
+                  className="input min-h-[220px]"
+                  value={workOrderDraft}
+                  onChange={(e) => setWorkOrderDraft(e.target.value)}
+                />
+                {req.work_order_generated_at && (
+                  <p className="text-xs text-slate-400">
+                    Generated{" "}
+                    {new Date(req.work_order_generated_at).toLocaleString()}
+                  </p>
+                )}
+                <button
+                  onClick={handleSaveWorkOrder}
+                  disabled={savingWorkOrder}
+                  className="inline-flex items-center justify-center rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-slate-700 disabled:opacity-50"
+                >
+                  {savingWorkOrder ? "Saving..." : "Save Draft"}
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={handleGenerateWorkOrder}
+                disabled={generatingWorkOrder}
+                className="inline-flex items-center justify-center rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-slate-700 disabled:opacity-50"
+              >
+                {generatingWorkOrder
+                  ? "Generating..."
+                  : "Generate Contractor Work Order"}
+              </button>
+            )}
+          </div>
+        )}
       </Section>
 
       {/* Notes */}
