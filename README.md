@@ -1,6 +1,6 @@
 # Rental Maintenance Tracker
 
-AI-powered rental property maintenance request tracker built for MNGT 745 Assignment 5B.
+AI-powered rental property maintenance request tracker built for MNGT 745 Assignment 6 Capstone.
 
 ## Live App
 
